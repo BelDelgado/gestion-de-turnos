@@ -1,0 +1,578 @@
+{% extends 'turnos/base.html' %}
+
+{% block title %}Reservar Turno - {{ prestador.nombre_negocio }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .service-card {
+        cursor: pointer;
+        transition: all 0.3s;
+        border: 2px solid transparent;
+    }
+    
+    .service-card:hover {
+        border-color: #2563eb;
+        transform: translateY(-5px);
+    }
+    
+    .service-card.selected {
+        border-color: #2563eb;
+        background-color: #eff6ff;
+    }
+    
+    .time-slot {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    
+    .time-slot:hover {
+        background-color: #e0e7ff;
+    }
+    
+    .time-slot.selected {
+        background-color: #2563eb;
+        color: white;
+    }
+    
+    .step {
+        display: none;
+    }
+    
+    .step.active {
+        display: block;
+    }
+    
+    .progress-step {
+        position: relative;
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 40px;
+    }
+    
+    .progress-step-item {
+        flex: 1;
+        text-align: center;
+        position: relative;
+    }
+    
+    .progress-step-item::before {
+        content: '';
+        position: absolute;
+        top: 15px;
+        left: -50%;
+        width: 100%;
+        height: 2px;
+        background-color: #e5e7eb;
+        z-index: -1;
+    }
+    
+    .progress-step-item:first-child::before {
+        display: none;
+    }
+    
+    .progress-step-item.active::before {
+        background-color: #2563eb;
+    }
+    
+    .progress-step-circle {
+        width: 30px;
+        height: 30px;
+        border-radius: 50%;
+        background-color: #e5e7eb;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 10px;
+        font-weight: bold;
+    }
+    
+    .progress-step-item.active .progress-step-circle {
+        background-color: #2563eb;
+        color: white;
+    }
+    
+    .prestador-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 60px 0;
+        margin-bottom: 40px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="prestador-header">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                {% if prestador.logo %}
+                    <img src="{{ prestador.logo.url }}" alt="{{ prestador.nombre_negocio }}" 
+                         class="img-fluid mb-3" style="max-height: 80px;">
+                {% endif %}
+                <h1 class="display-4 fw-bold">{{ prestador.nombre_negocio }}</h1>
+                <p class="lead">{{ prestador.descripcion }}</p>
+                {% if prestador.direccion %}
+                    <p><i class="bi bi-geo-alt"></i> {{ prestador.direccion }}</p>
+                {% endif %}
+            </div>
+            <div class="col-md-4 text-center">
+                <i class="bi bi-calendar-check" style="font-size: 120px; opacity: 0.3;"></i>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Progress Steps -->
+    <div class="progress-step">
+        <div class="progress-step-item active" id="progress-1">
+            <div class="progress-step-circle">1</div>
+            <div class="small">Datos</div>
+        </div>
+        <div class="progress-step-item" id="progress-2">
+            <div class="progress-step-circle">2</div>
+            <div class="small">Servicio</div>
+        </div>
+        <div class="progress-step-item" id="progress-3">
+            <div class="progress-step-circle">3</div>
+            <div class="small">Fecha</div>
+        </div>
+        <div class="progress-step-item" id="progress-4">
+            <div class="progress-step-circle">4</div>
+            <div class="small">Pago</div>
+        </div>
+    </div>
+
+    <!-- Formulario de Reserva -->
+    <form id="reservaForm">
+        {% csrf_token %}
+        
+        <!-- Paso 1: Datos del Cliente -->
+        <div class="step active" id="step-1">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">
+                        <i class="bi bi-person-fill"></i> Tus Datos
+                    </h3>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">¿Ya tienes una reserva anterior?</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="cliente_tipo" 
+                                   id="clienteNuevo" value="nuevo" checked>
+                            <label class="form-check-label" for="clienteNuevo">
+                                Primera vez / Nuevo cliente
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="cliente_tipo" 
+                                   id="clienteExistente" value="existente">
+                            <label class="form-check-label" for="clienteExistente">
+                                Ya he reservado antes
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="formClienteNuevo">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="nombre" class="form-label">Nombre *</label>
+                                <input type="text" class="form-control" id="nombre" name="nombre" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="apellido" class="form-label">Apellido *</label>
+                                <input type="text" class="form-control" id="apellido" name="apellido" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="email" class="form-label">Email *</label>
+                                <input type="email" class="form-control" id="email" name="email" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="dni" class="form-label">DNI *</label>
+                                <input type="text" class="form-control" id="dni" name="dni" required>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="telefono" class="form-label">Teléfono</label>
+                                <input type="tel" class="form-control" id="telefono" name="telefono">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento</label>
+                                <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="formClienteExistente" style="display: none;">
+                        <div class="mb-3">
+                            <label for="dni_existente" class="form-label">DNI *</label>
+                            <input type="text" class="form-control" id="dni_existente" name="dni_existente">
+                            <small class="form-text text-muted">
+                                Ingresa tu DNI para recuperar tus datos
+                            </small>
+                        </div>
+                        <button type="button" class="btn btn-outline-primary" id="buscarCliente">
+                            <i class="bi bi-search"></i> Buscar
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-end mt-3">
+                <button type="button" class="btn btn-primary" onclick="nextStep(2)">
+                    Siguiente <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Paso 2: Selección de Servicio -->
+        <div class="step" id="step-2">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">
+                        <i class="bi bi-briefcase"></i> Selecciona un Servicio
+                    </h3>
+                    
+                    <div class="row" id="servicios-container">
+                        {% for servicio in servicios %}
+                            <div class="col-md-6 mb-3">
+                                <div class="card service-card h-100" 
+                                     data-servicio-id="{{ servicio.id }}"
+                                     data-precio="{{ servicio.precio }}"
+                                     data-duracion="{{ servicio.duracion_minutos }}"
+                                     onclick="selectServicio(this)">
+                                    <div class="card-body">
+                                        <h5 class="card-title">{{ servicio.nombre }}</h5>
+                                        <p class="card-text text-muted">{{ servicio.descripcion }}</p>
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <span class="badge bg-primary">{{ servicio.get_categoria_display }}</span>
+                                            <div>
+                                                <span class="badge bg-success">${{ servicio.precio }}</span>
+                                                <span class="badge bg-info">{{ servicio.duracion_minutos }} min</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    
+                    <input type="hidden" id="servicio_id" name="servicio_id" required>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between mt-3">
+                <button type="button" class="btn btn-secondary" onclick="prevStep(1)">
+                    <i class="bi bi-arrow-left"></i> Anterior
+                </button>
+                <button type="button" class="btn btn-primary" onclick="nextStep(3)" id="btnStep2">
+                    Siguiente <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Paso 3: Selección de Fecha y Hora -->
+        <div class="step" id="step-3">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">
+                        <i class="bi bi-calendar3"></i> Selecciona Fecha y Hora
+                    </h3>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="agenda_id" class="form-label">Agenda</label>
+                            <select class="form-control" id="agenda_id" name="agenda_id" required>
+                                <option value="">Selecciona una agenda</option>
+                                {% for agenda in agendas %}
+                                    <option value="{{ agenda.id }}">{{ agenda.nombre }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        
+                        <div class="col-md-6 mb-3">
+                            <label for="fecha" class="form-label">Fecha</label>
+                            <input type="date" class="form-control" id="fecha" name="fecha" 
+                                   min="" required>
+                        </div>
+                    </div>
+                    
+                    <div id="horariosDisponibles" class="mt-4">
+                        <h5>Horarios Disponibles</h5>
+                        <div id="slots-container" class="d-flex flex-wrap gap-2">
+                            <p class="text-muted">Selecciona una fecha para ver los horarios disponibles</p>
+                        </div>
+                    </div>
+                    
+                    <input type="hidden" id="hora" name="hora" required>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between mt-3">
+                <button type="button" class="btn btn-secondary" onclick="prevStep(2)">
+                    <i class="bi bi-arrow-left"></i> Anterior
+                </button>
+                <button type="button" class="btn btn-primary" onclick="nextStep(4)" id="btnStep3">
+                    Siguiente <i class="bi bi-arrow-right"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Paso 4: Confirmación y Pago -->
+        <div class="step" id="step-4">
+            <div class="card">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">
+                        <i class="bi bi-check-circle"></i> Confirmar Reserva
+                    </h3>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Resumen de tu Reserva</h5>
+                            <ul class="list-unstyled">
+                                <li><strong>Servicio:</strong> <span id="resumen-servicio"></span></li>
+                                <li><strong>Fecha:</strong> <span id="resumen-fecha"></span></li>
+                                <li><strong>Hora:</strong> <span id="resumen-hora"></span></li>
+                                <li><strong>Duración:</strong> <span id="resumen-duracion"></span> minutos</li>
+                            </ul>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="card bg-light">
+                                <div class="card-body">
+                                    <h5>Total a Pagar</h5>
+                                    <h2 class="text-primary">$<span id="resumen-precio"></span></h2>
+                                    <p class="small text-muted mb-0" id="tipo-pago-texto"></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="alert alert-info mt-3">
+                        <i class="bi bi-info-circle"></i>
+                        <strong>Política de Cancelación:</strong>
+                        Puedes cancelar con devolución hasta {{ prestador.horas_cancelacion_con_devolucion }} horas antes del turno.
+                        Cancelaciones con menos de {{ prestador.horas_cancelacion_sin_devolucion }} horas de anticipación 
+                        no tendrán devolución.
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-between mt-3">
+                <button type="button" class="btn btn-secondary" onclick="prevStep(3)">
+                    <i class="bi bi-arrow-left"></i> Anterior
+                </button>
+                <button type="submit" class="btn btn-success btn-lg" id="btnFinalizar">
+                    <i class="bi bi-credit-card"></i> Proceder al Pago
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modal de Carga -->
+<div class="modal fade" id="loadingModal" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-body text-center p-5">
+                <div class="spinner-border text-primary mb-3" role="status" style="width: 3rem; height: 3rem;">
+                    <span class="visually-hidden">Cargando...</span>
+                </div>
+                <h5>Procesando tu reserva...</h5>
+                <p class="text-muted">Por favor espera</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://sdk.mercadopago.com/js/v2"></script>
+<script>
+    let currentStep = 1;
+    let selectedServicio = null;
+    let selectedHora = null;
+    
+    // Configurar fecha mínima (hoy)
+    document.getElementById('fecha').min = new Date().toISOString().split('T')[0];
+    
+    // Toggle entre cliente nuevo y existente
+    document.querySelectorAll('input[name="cliente_tipo"]').forEach(radio => {
+        radio.addEventListener('change', function() {
+            if (this.value === 'nuevo') {
+                document.getElementById('formClienteNuevo').style.display = 'block';
+                document.getElementById('formClienteExistente').style.display = 'none';
+            } else {
+                document.getElementById('formClienteNuevo').style.display = 'none';
+                document.getElementById('formClienteExistente').style.display = 'block';
+            }
+        });
+    });
+    
+    function nextStep(step) {
+        // Validar paso actual antes de avanzar
+        if (!validateCurrentStep()) {
+            return;
+        }
+        
+        document.getElementById('step-' + currentStep).classList.remove('active');
+        document.getElementById('progress-' + currentStep).classList.remove('active');
+        
+        currentStep = step;
+        
+        document.getElementById('step-' + step).classList.add('active');
+        document.getElementById('progress-' + step).classList.add('active');
+        
+        window.scrollTo(0, 0);
+    }
+    
+    function prevStep(step) {
+        document.getElementById('step-' + currentStep).classList.remove('active');
+        document.getElementById('progress-' + currentStep).classList.remove('active');
+        
+        currentStep = step;
+        
+        document.getElementById('step-' + step).classList.add('active');
+        document.getElementById('progress-' + step).classList.add('active');
+        
+        window.scrollTo(0, 0);
+    }
+    
+    function selectServicio(card) {
+        document.querySelectorAll('.service-card').forEach(c => c.classList.remove('selected'));
+        card.classList.add('selected');
+        
+        selectedServicio = {
+            id: card.dataset.servicioId,
+            nombre: card.querySelector('.card-title').textContent,
+            precio: card.dataset.precio,
+            duracion: card.dataset.duracion
+        };
+        
+        document.getElementById('servicio_id').value = selectedServicio.id;
+        document.getElementById('btnStep2').disabled = false;
+    }
+    
+    // Cargar horarios disponibles
+    document.getElementById('fecha').addEventListener('change', cargarHorarios);
+    document.getElementById('agenda_id').addEventListener('change', cargarHorarios);
+    
+    function cargarHorarios() {
+        const fecha = document.getElementById('fecha').value;
+        const agendaId = document.getElementById('agenda_id').value;
+        
+        if (!fecha || !agendaId || !selectedServicio) return;
+        
+        fetch(`/api/disponibilidad/?fecha=${fecha}&agenda_id=${agendaId}&servicio_id=${selectedServicio.id}`)
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('slots-container');
+                container.innerHTML = '';
+                
+                if (data.slots.length === 0) {
+                    container.innerHTML = '<p class="text-muted">No hay horarios disponibles para esta fecha</p>';
+                    return;
+                }
+                
+                data.slots.forEach(slot => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn btn-outline-primary time-slot';
+                    btn.textContent = slot;
+                    btn.onclick = () => selectHora(btn, slot);
+                    container.appendChild(btn);
+                });
+            });
+    }
+    
+    function selectHora(btn, hora) {
+        document.querySelectorAll('.time-slot').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedHora = hora;
+        document.getElementById('hora').value = hora;
+        document.getElementById('btnStep3').disabled = false;
+    }
+    
+    function validateCurrentStep() {
+        if (currentStep === 1) {
+            const tipo = document.querySelector('input[name="cliente_tipo"]:checked').value;
+            if (tipo === 'nuevo') {
+                const nombre = document.getElementById('nombre').value;
+                const apellido = document.getElementById('apellido').value;
+                const email = document.getElementById('email').value;
+                const dni = document.getElementById('dni').value;
+                
+                if (!nombre || !apellido || !email || !dni) {
+                    alert('Por favor completa todos los campos requeridos');
+                    return false;
+                }
+            }
+        } else if (currentStep === 2) {
+            if (!selectedServicio) {
+                alert('Por favor selecciona un servicio');
+                return false;
+            }
+        } else if (currentStep === 3) {
+            if (!selectedHora) {
+                alert('Por favor selecciona un horario');
+                return false;
+            }
+            
+            // Actualizar resumen
+            document.getElementById('resumen-servicio').textContent = selectedServicio.nombre;
+            document.getElementById('resumen-fecha').textContent = document.getElementById('fecha').value;
+            document.getElementById('resumen-hora').textContent = selectedHora;
+            document.getElementById('resumen-duracion').textContent = selectedServicio.duracion;
+            document.getElementById('resumen-precio').textContent = selectedServicio.precio;
+            
+            {% if prestador.requiere_pago_total %}
+                document.getElementById('tipo-pago-texto').textContent = 'Pago total';
+                {% else %}
+                document.getElementById('tipo-pago-texto').textContent = 'Seña del {{ prestador.porcentaje_seña }}%';
+            {% endif %}
+        }
+        
+        return true;
+    }
+    
+    // Enviar formulario
+    document.getElementById('reservaForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData);
+        data.prestador_id = {{ prestador.id }};
+        
+        // Mostrar modal de carga
+        const loadingModal = new bootstrap.Modal(document.getElementById('loadingModal'));
+        loadingModal.show();
+        
+        fetch('{% url "procesar_reserva" %}', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.mp_preference_id) {
+                // Redirigir a MercadoPago
+                window.location.href = data.init_point;
+            } else {
+                loadingModal.hide();
+                alert('Reserva creada exitosamente');
+                window.location.href = '/';
+            }
+        })
+        .catch(error => {
+            loadingModal.hide();
+            alert('Error al procesar la reserva: ' + error);
+        });
+    });
+</script>
+{% endblock %}
